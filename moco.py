@@ -5,6 +5,8 @@ from torchvision.models import resnet
 import torch
 import torch.nn as nn
 
+import copy
+
 class SplitBatchNorm(nn.BatchNorm2d):
     def __init__(self, num_features, num_splits, **kw):
         super().__init__(num_features, **kw)
@@ -78,7 +80,7 @@ class ModelBase(nn.Module):
         return x
 
 class MoCo(nn.Module):
-    def __init__(self, dim=128, K=4096, m=0.99, T=0.1, ver=1, arch='resnet18', bn_splits=8, symmetric=True):
+    def __init__(self, dim=128, K=4096, m=0.99, T=0.1, ver=1, arch='resnet18', bn_splits=8, symmetric=True, v3_encoder=None):
         super(MoCo, self).__init__()
 
         self.K = K
@@ -87,8 +89,12 @@ class MoCo(nn.Module):
         self.symmetric = symmetric
 
         # create the encoders
-        self.encoder_q = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
-        self.encoder_k = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
+        if ver == 3:
+            self.encoder_q = copy.deepcopy(v3_encoder)
+            self.encoder_k = copy.deepcopy(v3_encoder)
+        else:
+            self.encoder_q = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
+            self.encoder_k = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
 
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize

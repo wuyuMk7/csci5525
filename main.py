@@ -7,12 +7,16 @@ import torch.nn.functional as F
 import torch
 
 import argparse
+import sys
 import os
 import json
 import math
 
 from data import load_train, load_test, load_memory
 from moco import MoCo
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'vit-pytorch')))
+from vit_pytorch import ViT
 
 # train for one epoch
 def train(net, data_loader, train_optimizer, epoch, args):
@@ -155,6 +159,18 @@ if __name__ == '__main__':
 
     print(args)
 
+    vit = ViT(
+        image_size = 32,
+        patch_size = 4,
+        num_classes = args.moco_dim,
+        dim = 256,
+        depth = 4,
+        heads = 16,
+        mlp_dim = 512,
+        dropout = 0.1,
+        emb_dropout = 0.1
+    )
+
     model = MoCo(
         dim=args.moco_dim,
         K=args.moco_k,
@@ -163,7 +179,8 @@ if __name__ == '__main__':
         ver=args.version,
         arch=args.arch,
         bn_splits=args.bn_splits,
-        symmetric=args.symmetric
+        symmetric=args.symmetric,
+        v3_encoder=vit
     ).cuda()
 
     print(model)
