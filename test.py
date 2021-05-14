@@ -18,39 +18,6 @@ from moco import MoCo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'vit-pytorch')))
 from vit_pytorch import ViT
 
-# train for one epoch
-def train(net, data_loader, train_optimizer, epoch, args):
-    net.train()
-    adjust_learning_rate(optimizer, epoch, args)
-
-    total_loss, total_num, train_bar = 0.0, 0, tqdm(data_loader)
-    for im_1, im_2 in train_bar:
-        im_1, im_2 = im_1.cuda(non_blocking=True), im_2.cuda(non_blocking=True)
-
-        loss = net(im_1, im_2)
-
-        train_optimizer.zero_grad()
-        loss.backward()
-        train_optimizer.step()
-
-        total_num += data_loader.batch_size
-        total_loss += loss.item() * data_loader.batch_size
-        train_bar.set_description('Train Epoch: [{}/{}], lr: {:.6f}, Loss: {:.4f}'.format(epoch, args.epochs, optimizer.param_groups[0]['lr'], total_loss / total_num))
-
-    return total_loss / total_num
-
-# lr scheduler for training
-def adjust_learning_rate(optimizer, epoch, args):
-    """Decay the learning rate based on schedule"""
-    lr = args.lr
-    if args.cos:  # cosine lr schedule
-        lr *= 0.5 * (1. + math.cos(math.pi * epoch / args.epochs))
-    else:  # stepwise lr schedule
-        for milestone in args.schedule:
-            lr *= 0.1 if epoch >= milestone else 1.
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
 # test using a knn monitor
 def test(net, memory_data_loader, test_data_loader, epoch, args):
     net.eval()
@@ -157,20 +124,14 @@ if __name__ == '__main__':
         args.cos = True
         args.symmetric = True
 
-    print(args)
-
     vit = ViT(
         image_size = 32,
         patch_size = 4,
         num_classes = args.moco_dim,
-        # dim = 256,
-        # depth = 4,
-        # heads = 12,
-        # mlp_dim = 512,
         dim = 256,
-        depth = 3,
-        heads = 8,
-        mlp_dim = 384,
+        depth = 4,
+        heads = 16,
+        mlp_dim = 512,
         dropout = 0.1,
         emb_dropout = 0.1
     )
@@ -187,41 +148,18 @@ if __name__ == '__main__':
         v3_encoder=vit
     ).cuda()
 
-    print(model)
-
     train_data, train_loader = load_train(args)
     memory_data, memory_loader = load_memory(args)
     test_data, test_loader = load_test(args)
-
-    # define optimizer
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.wd, momentum=0.9)
-
     # load model if resume
     epoch_start = 1
+
     if args.resume != '':
         checkpoint = torch.load(args.resume)
         model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
         epoch_start = checkpoint['epoch'] + 1
         print('Loaded from: {}'.format(args.resume))
 
-    # logging
-    results = {'train_loss': [], 'test_acc@1': []}
-    if not os.path.exists(args.results_dir):
-        # os.mkdir(args.results_dir)
-        os.makedirs(args.results_dir)
-    # dump args
-    with open(args.results_dir + '/args.json', 'w') as fid:
-        json.dump(args.__dict__, fid, indent=2)
+    test_acc_1 = test(model.encoder_q, memory_loader, test_loader, 1, args)
+    print(test_acc_1)
 
-    # training loop
-    for epoch in range(epoch_start, args.epochs + 1):
-        train_loss = train(model, train_loader, optimizer, epoch, args)
-        results['train_loss'].append(train_loss)
-        test_acc_1 = test(model.encoder_q, memory_loader, test_loader, epoch, args)
-        results['test_acc@1'].append(test_acc_1)
-        # save statistics
-        data_frame = pd.DataFrame(data=results, index=range(epoch_start, epoch + 1))
-        data_frame.to_csv(args.results_dir + '/log.csv', index_label='epoch')
-        # save model
-        torch.save({'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer' : optimizer.state_dict(),}, args.results_dir + '/model_last.pth')

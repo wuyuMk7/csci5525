@@ -90,9 +90,11 @@ class MoCo(nn.Module):
 
         # create the encoders
         if ver == 3:
+            self.ver3 = True
             self.encoder_q = copy.deepcopy(v3_encoder)
             self.encoder_k = copy.deepcopy(v3_encoder)
         else:
+            self.ver3 = False
             self.encoder_q = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
             self.encoder_k = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
 
@@ -183,6 +185,29 @@ class MoCo(nn.Module):
 
         return loss, q, k
 
+    def v3_loss(self, imq, imk):
+        # compute query features
+        q = self.encoder_q(imq)  # queries: NxC
+        q = nn.functional.normalize(q, dim=1)  # already normalized
+
+        # compute key features
+        with torch.no_grad():  # no gradient to keys
+            # shuffle for making use of BN
+            im_k_, idx_unshuffle = self._batch_shuffle_single_gpu(imk)
+
+            k = self.encoder_k(im_k_)  # keys: NxC
+            k = nn.functional.normalize(k, dim=1)  # already normalized
+
+            # undo shuffle
+            k = self._batch_unshuffle_single_gpu(k, idx_unshuffle)
+
+        logits = torch.mm(q, k.t())
+        N = q.size(0)
+        labels = range(N)
+        labels = torch.LongTensor(labels).cuda()
+        loss = nn.CrossEntropyLoss().cuda()(logits / self.T, labels)
+        return 2 * self.T * loss
+
     def forward(self, im1, im2):
         """
         Input:
@@ -196,15 +221,20 @@ class MoCo(nn.Module):
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()
 
-        # compute loss
-        if self.symmetric:  # symmetric loss, for v3
-            loss_12, q1, k2 = self.contrastive_loss(im1, im2)
-            loss_21, q2, k1 = self.contrastive_loss(im2, im1)
-            loss = loss_12 + loss_21
-            k = torch.cat([k1, k2], dim=0)
-        else:  # asymmetric loss
-            loss, q, k = self.contrastive_loss(im1, im2)
+        if self.ver3:
+            loss_qk = self.v3_loss(im1, im2)
+            loss_kq = self.v3_loss(im2, im1)
+            loss = loss_qk + loss_kq
+        else:
+            # compute loss
+            if self.symmetric:  # symmetric loss, for v3
+                loss_12, q1, k2 = self.contrastive_loss(im1, im2)
+                loss_21, q2, k1 = self.contrastive_loss(im2, im1)
+                loss = loss_12 + loss_21
+                k = torch.cat([k1, k2], dim=0)
+            else:  # asymmetric loss
+                loss, q, k = self.contrastive_loss(im1, im2)
 
-        self._dequeue_and_enqueue(k)
+            self._dequeue_and_enqueue(k)
 
         return loss
