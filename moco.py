@@ -4,8 +4,12 @@ from functools import partial
 from torchvision.models import resnet
 import torch
 import torch.nn as nn
-
 import copy
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'vit-pytorch')))
+from vit_pytorch import ViT
 
 class SplitBatchNorm(nn.BatchNorm2d):
     def __init__(self, num_features, num_splits, **kw):
@@ -79,6 +83,59 @@ class ModelBase(nn.Module):
         # note: not normalized here
         return x
 
+class ViTBase(nn.Module):
+    def __init__(self, moco_dim):
+        super(ViTBase, self).__init__()
+
+        # use split batchnorm
+        # norm_layer = partial(SplitBatchNorm, num_splits=bn_splits) if bn_splits > 1 else nn.BatchNorm2d
+        # resnet_arch = getattr(resnet, arch)
+        # net = resnet_arch(num_classes=feature_dim, norm_layer=norm_layer)
+
+        vit_dim = 256
+        proj_hid_dim = 1024
+
+        vit = ViT(
+            image_size = 32,
+            patch_size = 4,
+            num_classes = moco_dim,
+            # dim = 256,
+            # depth = 4,
+            # heads = 12,
+            # mlp_dim = 512,
+            dim = vit_dim,
+            depth = 3,
+            heads = 8,
+            mlp_dim = 384,
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
+
+        # net = []
+        # for name, module in vit.named_children():
+        #     if name != "mlp_head":
+        #         net.append(module)
+        # self.net = nn.Sequential(*net)
+        self.net = vit
+
+        self.net.mlp_head = nn.Sequential(
+            nn.Linear(vit_dim, proj_hid_dim),
+            nn.BatchNorm1d(proj_hid_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(proj_hid_dim, proj_hid_dim),
+            nn.BatchNorm1d(proj_hid_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(proj_hid_dim, moco_dim)
+        )
+        self.net.mlp_head.requires_grad = False
+
+    def forward(self, x):
+        x = self.net(x)
+        # print(x.shape)
+        # exit(0)
+        return x
+
+
 class MoCo(nn.Module):
     def __init__(self, dim=128, K=4096, m=0.99, T=0.1, ver=1, arch='resnet18', bn_splits=8, symmetric=True, v3_encoder=None):
         super(MoCo, self).__init__()
@@ -91,8 +148,19 @@ class MoCo(nn.Module):
         # create the encoders
         if ver == 3:
             self.ver3 = True
-            self.encoder_q = copy.deepcopy(v3_encoder)
-            self.encoder_k = copy.deepcopy(v3_encoder)
+
+            # self.encoder_q = ViTBase(copy.deepcopy(v3_encoder))
+            # self.encoder_k = ViTBase(copy.deepcopy(v3_encoder))
+            # self.encoder_q = copy.deepcopy(v3_encoder)
+            # self.encoder_k = copy.deepcopy(v3_encoder)
+            self.encoder_q = ViTBase(dim)
+            self.encoder_k = ViTBase(dim)
+            self.predictor = nn.Sequential(
+                nn.Linear(dim, dim),
+                nn.BatchNorm1d(dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(dim, dim),
+            )
         else:
             self.ver3 = False
             self.encoder_q = ModelBase(feature_dim=dim, arch=arch, bn_splits=bn_splits, ver=ver)
@@ -187,7 +255,7 @@ class MoCo(nn.Module):
 
     def v3_loss(self, imq, imk):
         # compute query features
-        q = self.encoder_q(imq)  # queries: NxC
+        q = self.predictor(self.encoder_q(imq))  # queries: NxC
         q = nn.functional.normalize(q, dim=1)  # already normalized
 
         # compute key features

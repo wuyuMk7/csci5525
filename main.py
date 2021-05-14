@@ -188,13 +188,17 @@ if __name__ == '__main__':
     ).cuda()
 
     print(model)
+    # exit(0)
 
     train_data, train_loader = load_train(args)
     memory_data, memory_loader = load_memory(args)
     test_data, test_loader = load_test(args)
 
     # define optimizer
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.wd, momentum=0.9)
+    if args.version == 3:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.wd, momentum=0.9)
 
     # load model if resume
     epoch_start = 1
