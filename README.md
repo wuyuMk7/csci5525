@@ -2,7 +2,7 @@
 
 This repository is for csci 5525 final project, spring 2020. 
 
-It consists of the code for the experiments on the MoCo framework mentioned in the report.
+It consists of the code for the experiments on the MoCo and SimCLR framework mentioned in the report.
 
 ## How to run it
 
@@ -47,6 +47,9 @@ Pre-trained models can be found [here](https://drive.google.com/drive/folders/1C
 - v3-2048-fix-0.002: 71.07
 - v3-2048-fix-0.0001: 51.85
 
+## SimCLR
+All code of reproducing SimCLR is included in the simclr.ipynb independently. The emulating environment of the project employs Google Colab. The main implementation is based on the reference repo listed below.
+
 
 
 ## References
@@ -63,4 +66,6 @@ Papers:
 [MoCo-v3 Skeleton Code](https://github.com/CupidJay/MoCov3-pytorch)
 
 [MoCo-v3 Code](https://github.com/searobbersduck/MoCo_v3_pytorch)
+
+[SimCLR Code](https://github.com/sthalles/SimCLR)
 
