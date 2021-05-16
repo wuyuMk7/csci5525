@@ -40,12 +40,13 @@ Pre-trained models can be found [here](https://drive.google.com/drive/folders/1C
 - v1-800: 84.28
 - v2-200: 80.26
 - v2-800: 88.62
-- v3-512-0.002: 64.33
-- v3-1024-0.002: 66.19
-- v3-2048-0.002: 64.88
-- v3-2048-0.0001: 48.37
-- v3-2048-fix-0.002: 71.07
-- v3-2048-fix-0.0001: 51.85
+- v3-300-512-0.002: 64.33
+- v3-300-1024-0.002: 66.19
+- v3-300-2048-0.002: 64.88
+- v3-300-2048-0.0001: 48.37
+- v3-300-2048-fix-0.002: 71.07
+- v3-300-2048-fix-0.0001: 51.85
+- v3-800-2048-fix-0.002: 77.48
 
 ## SimCLR
 All code of reproducing SimCLR is included in the simclr.ipynb independently. The emulating environment of the project employs Google Colab. The main implementation is based on the reference repo listed below.
