@@ -67,5 +67,5 @@ Papers:
 
 [MoCo-v3 Code](https://github.com/searobbersduck/MoCo_v3_pytorch)
 
-[SimCLR Code] (https://github.com/sthalles/SimCLR)
+[SimCLR Code](https://github.com/sthalles/SimCLR)
 
