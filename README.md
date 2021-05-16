@@ -2,7 +2,9 @@
 
 This repository is for csci 5525 final project, spring 2020. 
 
-## How to run this project
+It consists of the code for the experiments on the MoCo framework mentioned in the report.
+
+## How to run it
 
 1. Clone the project to your local computer and load the submodules
 ```
