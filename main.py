@@ -110,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', default=16, type=int, help='number of workers')
 
     # lr: 0.06 for batch 512 (or 0.03 for batch 256)
+    # parser.add_argument('--lr', '--learning-rate', default=0.002, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--lr', '--learning-rate', default=0.06, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int, help='learning rate schedule (when to drop lr by 10x); does not take effect if --cos is on')
